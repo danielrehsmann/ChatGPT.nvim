@@ -19,6 +19,11 @@ function Api.chat_completions(custom_params, cb, should_stop)
   if params.model == "<dynamic>" then
     params.model = openai_params.model
   end
+-- max_tokens is unsupported for o1 OpenAI models; older models are backward-compatible with max_tokens,
+  -- but max_completion_tokens works with all models.
+  params.max_completion_tokens = params.max_tokens
+  params.max_tokens = nil
+
   local stream = params.stream or false
   if stream then
     local raw_chunks = ""
@@ -104,6 +109,20 @@ function Api.edits(custom_params, cb)
     vim.notify("Edit models are deprecated", vim.log.levels.WARN)
     Api.make_call(Api.EDITS_URL, params, cb)
     return
+  end
+
+  if params.model == "o1-preview" or params.model == "o1-mini" then
+    -- max_tokens is unsupported for o1 OpenAI models; older models are backward-compatible with max_tokens,
+    -- but max_completion_tokens works with all models.
+    params.max_completion_tokens = params.max_tokens
+    params.max_tokens = nil
+    -- o1 models changed "system" message role to "developer", however, current API
+    -- only accepts "user" or "assistant". this will probably be fixed in the future.
+    for _, message in ipairs(params.messages) do
+      if message.role == "system" then
+        message.role = "user"
+      end
+    end
   end
 
   Api.make_call(Api.CHAT_COMPLETIONS_URL, params, cb)
